@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout android:id="@+id/FrameLayout01"
+    android:layout_width="fill_parent" android:layout_height="fill_parent"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <SurfaceView android:id="@+id/SurfaceView01"
+        android:layout_width="wrap_content" android:layout_height="wrap_content">
+    </SurfaceView>
+
+    <SurfaceView
+        android:id="@+id/SurfaceView02"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"></SurfaceView>
+
+    <SurfaceView
+        android:id="@+id/SurfaceView03"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="end"
+        android:layout_margin="10dp"
+        android:max="100"
+        android:progress="3"></SurfaceView>
+
+    <Button android:text="@+id/Button01" android:id="@+id/Button01"
+        android:layout_width="wrap_content" android:layout_height="wrap_content">
+    </Button>
+
+    <SeekBar
+        android:id="@+id/seekBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:layout_marginBottom="30dp"
+        android:max="300"
+        android:progress="75" />
+
+    <SeekBar
+        android:id="@+id/seekBar1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:max="300"
+        android:progress="130" />
+
+    <!--<org.opencv.android.JavaCameraView
+        android:id="@+id/cameraViewer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"></org.opencv.android.JavaCameraView>-->
+</FrameLayout>
