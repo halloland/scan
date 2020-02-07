@@ -24,6 +24,7 @@ import android.hardware.SensorManager;
 import android.os.Bundle;
 import android.util.FloatMath;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.ViewGroup.LayoutParams;
@@ -34,6 +35,7 @@ import android.view.View;
 
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 
 import org.opencv.android.OpenCVLoader;
@@ -49,6 +51,7 @@ import org.opencv.core.RotatedRect;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.opencv.imgproc.Moments;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -74,6 +77,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     private SurfaceView preview;
     private Button shotBtn;
 
+    private ImageView imageView;
+
     private float ratioHeight = 0;
     private float ratioWidth = 0;
 
@@ -82,6 +87,9 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     private int treshHold1 = 75;
     private int treshHold2 = 130;
 
+    private Mat srcMat;
+
+    private List<Point> lastPoints;
 
     public int getResourceId(String name, String defType) {
         return getResources().getIdentifier(name, defType, this.getPackageName());
@@ -114,6 +122,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         requestWindowFeature(Window.FEATURE_NO_TITLE);
 
         setContentView(this.getResourceId("scan", "layout"));
+
+        imageView = (ImageView) findViewById(this.getResourceId("imageView", "id"));
 
         // наше SurfaceView имеет имя SurfaceView01
         preview = (SurfaceView) findViewById(this.getResourceId("SurfaceView01", "id"));
@@ -235,8 +245,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
 
     private void Draw(List<Point> points)
-
     {
+        lastPoints = points;
 
         Canvas canvas = holderTransparent.lockCanvas(null);
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
@@ -374,9 +384,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         {
             // либо делаем снимок непосредственно здесь
             // 	либо включаем обработчик автофокуса
+            camera.takePicture(null, null, null, this);
 
-            //camera.takePicture(null, null, null, this);
-            camera.autoFocus(this);
         }
     }
 
@@ -388,19 +397,169 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
         try
         {
-            File saveDir = new File("/sdcard/CameraExample/");
+            Bitmap bitmap = BitmapFactory.decodeByteArray(paramArrayOfByte, 0, paramArrayOfByte.length);
+            //imageView.setImageBitmap(bitmap);
+            //imageView.setVisibility(View.VISIBLE);
 
-            if (!saveDir.exists())
-            {
-                saveDir.mkdirs();
+            /*for (int i = 1; i < lastPoints.size(); i++) {
+                Point point = lastPoints.get(i);
+                point.x *= ratioWidth;
+                point.y *= ratioHeight;
+            }*/
+            double minY = 0;
+            double minX = 0;
+            double maxY = 0;
+            double maxX = 0;
+            boolean init = false;
+            for (int i = 0; i < lastPoints.size(); i++){
+                Point point = lastPoints.get(i);
+                if(!init){
+                    maxY = minY = point.y;
+                    maxX = minX = point.x;
+                    init = true;
+                } else {
+                    if(point.y > maxY){
+                        maxY = point.y;
+                    }
+                    if(point.x > maxX){
+                        maxX = point.x;
+                    }
+                    if(minY > point.y){
+                        minY = point.y;
+                    }
+                    if(minX > point.x){
+                        minX = point.x;
+                    }
+                }
             }
 
-            FileOutputStream os = new FileOutputStream(String.format("/sdcard/CameraExample/%d.jpg", System.currentTimeMillis()));
-            os.write(paramArrayOfByte);
-            os.close();
+
+
+            double averageX = (minX + maxX) / 2;
+            double avarageY = (minY + maxY) / 2;
+
+            Log.e("points", lastPoints.toString());
+            Log.e("pointsav", String.valueOf(averageX) + " " + String.valueOf(avarageY));
+
+            Point[] sortedPoints = new Point[4];
+
+            for (int i = 0; i < lastPoints.size(); i++){
+                Point point2 = lastPoints.get(i);
+                Log.e("points1", point2.toString());
+                if(point2.x < averageX && point2.y < avarageY){
+                    Log.e("points", "point1 found");
+                    sortedPoints[0] = point2;
+                } else if(point2.x > averageX && point2.y < avarageY){
+                    Log.e("points", "point2 found");
+                    sortedPoints[1] = point2;
+                } else if(point2.x < averageX && point2.y > avarageY){
+                    Log.e("points", "point3 found");
+                    sortedPoints[2] = point2;
+                } else {
+                    Log.e("points", "point4 found");
+                    sortedPoints[3] = point2;
+                }
+            }
+
+
+
+            Mat frame = Imgcodecs.imdecode(new MatOfByte(paramArrayOfByte), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+
+
+           // MatOfPoint2f  m2f = new MatOfPoint2f(lastPoints.get(1), lastPoints.get(0), lastPoints.get(2), lastPoints.get(3));
+            //MatOfPoint2f  m2f = new MatOfPoint2f((Point[]) lastPoints.toArray());
+            /*double arc = Imgproc.arcLength(m2f, true);
+            MatOfPoint2f approx = new MatOfPoint2f();
+            Imgproc.approxPolyDP(m2f, approx, arc*0.02, true);
+            Log.e("points", lastPoints.toString());
+
+            Moments moment = Imgproc.moments(approx);
+            int x = (int) (moment.get_m10() / moment.get_m00());
+            int y = (int) (moment.get_m01() / moment.get_m00());
+
+
+            Point[] sortedPoints = new Point[4];
+
+            double[] data;
+            int count = 0;
+            for(int i=0; i<approx.rows(); i++){
+                data = approx.get(i, 0);
+                double datax = data[0];
+                double datay = data[1];
+                if(datax < x && datay < y){
+                    Log.e("points", "found 1");
+                    sortedPoints[0]=new Point(datax,datay);
+                    count++;
+                }else if(datax > x && datay < y){
+                    Log.e("points", "found 2");
+                    sortedPoints[1]=new Point(datax,datay);
+                    count++;
+                }else if (datax < x && datay > y){
+                    Log.e("points", "found 3");
+                    sortedPoints[2]=new Point(datax,datay);
+                    count++;
+                }else if (datax > x && datay > y){
+                    Log.e("points", "found 4");
+                    sortedPoints[3]=new Point(datax,datay);
+                    count++;
+                }
+            }*/
+
+            //Log.e("sizes5", sortedPoints[2].toString());
+
+
+
+            MatOfPoint2f src = new MatOfPoint2f(
+                    sortedPoints
+            );
+
+
+            Log.e("sizes1", String.valueOf(srcMat.width()) + " " + String.valueOf(srcMat.height()));
+
+
+            MatOfPoint2f dst = new MatOfPoint2f(
+                    new Point(0, 0),
+                    new Point(maxX,0),
+                    new Point(0,maxY),
+                    new Point(maxX,maxY)
+            );
+
+            Mat warpMat = Imgproc.getPerspectiveTransform(src,dst);
+            //This is you new image as Mat
+            Mat destImage = new Mat();
+            Imgproc.warpPerspective(srcMat, destImage, warpMat, new org.opencv.core.Size(maxX, maxY));
+
+
+            Bitmap bmp = Bitmap.createBitmap(destImage.cols(), destImage.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(destImage, bmp);
+
+            imageView.setImageBitmap(bmp);
+            imageView.setVisibility(View.VISIBLE);
+
+
+            /*Rect rectCrop = new Rect(lastPoints.get(0).x, p1.y , (p4.x-p1.x+1), (p4.y-p1.y+1));
+            Mat image_output= image_original.submat(rectCrop);*/
+
+            if (bitmap.getWidth() >= bitmap.getHeight()){
+
+
+                /*dstBmp = Bitmap.createBitmap(
+                        bitmap,
+                        bitmap.getWidth()/2 - bitmap.getHeight()/2,
+                        0,
+                        bitmap.getHeight(),
+                        bitmap.getHeight()
+                );*/
+
+            }
+
+
+            Log.e("success", "success " + frame.width() + " " + frame.height());
+
         }
         catch (Exception e)
         {
+            e.printStackTrace();
         }
 
         // после того, как снимок сделан, показ превью отключается. необходимо включить его
@@ -413,8 +572,17 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         if (paramBoolean)
         {
             // если удалось сфокусироваться, делаем снимок
-            paramCamera.takePicture(null, null, null, this);
+           // paramCamera.takePicture(null, null, null, this);
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+
+        camera.autoFocus(this);
+
+        return super.onTouchEvent(event);
+
     }
 
 
@@ -451,6 +619,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         Mat gray = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
         Core.transpose(frame, frame);
         Core.flip(frame, frame, 1);
+        srcMat = frame.clone();
 
         Core.transpose(gray, gray);
         Core.flip(gray, gray, 1);
@@ -499,7 +668,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
             org.opencv.core.Rect largestRect = null;
             MatOfPoint2f shape = null;
-
             for (MatOfPoint contour : contours) {
                 RotatedRect boundingRect = Imgproc.minAreaRect(new MatOfPoint2f(contour.toArray()));
 
@@ -539,8 +707,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             if(largestRect != null && shape != null){
 
 
-
-                if(shape.total() <= 8 && shape.total() > 3){
+                // TODO get shape with > 5 angles and find the biggest square
+                if(shape.total() == 4){
                     List<Point> points = shape.toList();
 
                     Collections.sort(points, new Comparator<Point>() {
