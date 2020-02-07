@@ -523,11 +523,18 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             //File destination = new File(getTempDirectoryPath() + "/" + System.currentTimeMillis() + "/" + source.getName());
 
             Log.e("success", "success " + frame.width() + " " + frame.height());
+            String newPath = this.cachePath + "/" + System.currentTimeMillis() + "/";
+            File dir = new File(newPath);
+            if(!dir.exists())
+                dir.mkdirs();
+            String destination =  newPath + "original_image.bmp";
+            if(Imgcodecs.imwrite(destination, destImage)){
+                Log.e("savedfilde", "yes");
+            } else {
+                Log.e("savedfilde", "no");
+            }
 
-            String destination = this.cachePath + "/" + System.currentTimeMillis() + "/" + "original_image.jpg";
 
-
-            Imgcodecs.imwrite(destination, destImage);
 
             Intent data = new Intent();
 

@@ -99,9 +99,9 @@ public class Scan extends CordovaPlugin {
         if(this.options != null){
             intent.putExtra("options", this.options.toString());
         }
-        if(sdCardPath != null){
-            intent.putExtra("cachePath", this.getTempDirectoryPath());
-        }
+        intent.putExtra("cachePath", this.getTempDirectoryPath());
+
+
 
 
         cordova.setActivityResultCallback(that);
