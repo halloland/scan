@@ -100,7 +100,7 @@ public class Scan extends CordovaPlugin {
             intent.putExtra("options", this.options.toString());
         }
         if(sdCardPath != null){
-            intent.putExtra("sdCardPath", sdCardPath);
+            intent.putExtra("cachePath", this.getTempDirectoryPath());
         }
 
 
@@ -114,15 +114,11 @@ public class Scan extends CordovaPlugin {
         if (resultCode == RESULT_OK) {
             String path = intent.getStringExtra("path");
             File source = new File(path);
-            try {
-                File destination = new File(getTempDirectoryPath() + "/" + System.currentTimeMillis() + "/" + source.getName());
-                copyFile(source, destination);
-                Uri resultUri = Uri.fromFile(destination);
 
-                callbackContext.success(resultUri.toString());
-            } catch (IOException e) {
-                callbackContext.error("Cant copy file to cache dir: " + e.getMessage());
-            }
+            Uri resultUri = Uri.fromFile(source);
+
+            callbackContext.success(resultUri.toString());
+
 
 
         } else {
