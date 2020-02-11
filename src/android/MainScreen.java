@@ -59,6 +59,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -86,7 +87,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     int  deviceHeight,deviceWidth;
 
     private int treshHold1 = 75;
-    private int treshHold2 = 130;
 
     private Mat srcMat;
 
@@ -167,8 +167,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         final SeekBar seekBar = (SeekBar)findViewById(getResourceId("seekBar", "id"));
         seekBar.setOnSeekBarChangeListener(this);
 
-        final SeekBar seekBar2 = (SeekBar)findViewById(getResourceId("seekBar1", "id"));
-        seekBar2.setOnSeekBarChangeListener(this);
 
 
     }
@@ -177,10 +175,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
         if(seekBar.getId() == getResourceId("seekBar", "id")){
             this.treshHold1 = progress;
-        } else {
-            this.treshHold2 = progress;
         }
-
     }
 
     @Override
@@ -260,11 +255,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
         //holderTransparent.setFixedSize(width, height);
         if(canvas != null){
-
-
-
-
-
             Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
             paint.setStyle(Paint.Style.STROKE);
@@ -360,8 +350,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         for (int i =0; i < pictureSizes.size(); i++){
 
             Size size = pictureSizes.get(i);
-
-            Log.e("biggest size", size.width + "x" + size.height + " " + (float) size.width/size.height + " " + aspect);
             int area = size.width * size.height;
             if(area > biggestArea && (float) size.width/size.height == aspect){
                 biggestSize = size;
@@ -429,11 +417,9 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     @Override
     public void onPictureTaken(byte[] paramArrayOfByte, Camera paramCamera)
     {
-        // сохраняем полученные jpg в папке /sdcard/CameraExample/
-        // имя файла - System.currentTimeMillis()
-
         try
         {
+
             Mat frame = Imgcodecs.imdecode(new MatOfByte(paramArrayOfByte), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
             Core.transpose(frame, frame);
             Core.flip(frame, frame, 1);
@@ -445,62 +431,70 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             }
 
 
-            double minY = 0;
-            double minX = 0;
-            double maxY = 0;
-            double maxX = 0;
-            boolean init = false;
-            for (int i = 0; i < lastPoints.size(); i++){
-                Point point = lastPoints.get(i);
-                if(!init){
-                    maxY = minY = point.y;
-                    maxX = minX = point.x;
-                    init = true;
-                } else {
-                    if(point.y > maxY){
-                        maxY = point.y;
+            Collections.sort(lastPoints, new Comparator<Point>() {
+                @Override
+                public int compare(Point o1, Point o2) {
+                    if(o1.x > o2.x){
+
+                        return 1;
+                    } else if(o1.x == o2.x){
+                        if(o1.y > o2.y){
+                            return 1;
+                        } else {
+                            return -1;
+                        }
                     }
-                    if(point.x > maxX){
-                        maxX = point.x;
-                    }
-                    if(minY > point.y){
-                        minY = point.y;
-                    }
-                    if(minX > point.x){
-                        minX = point.x;
-                    }
+
+
+                    return -1;
                 }
-            }
-
-
-
-            double averageX = (minX + maxX) / 2;
-            double avarageY = (minY + maxY) / 2;
+            });
 
 
             Point[] sortedPoints = new Point[4];
 
-            for (int i = 0; i < lastPoints.size(); i++){
-                Point point2 = lastPoints.get(i);
-                if(point2.x < averageX && point2.y < avarageY){
-
-                    sortedPoints[0] = point2;
-                } else if(point2.x > averageX && point2.y < avarageY){
-                    sortedPoints[1] = point2;
-                } else if(point2.x < averageX && point2.y > avarageY){
-                    sortedPoints[2] = point2;
-                } else {
-                    sortedPoints[3] = point2;
-                }
+            if(lastPoints.get(0).y > lastPoints.get(1).y){
+                sortedPoints[0] = lastPoints.get(1);
+                sortedPoints[2] = lastPoints.get(0);
+            } else {
+                sortedPoints[0] = lastPoints.get(0);
+                sortedPoints[2] = lastPoints.get(1);
             }
 
+            if(lastPoints.get(2).y > lastPoints.get(3).y){
+                sortedPoints[1] = lastPoints.get(3);
+                sortedPoints[3] = lastPoints.get(2);
+            } else {
+                sortedPoints[1] = lastPoints.get(2);
+                sortedPoints[3] = lastPoints.get(3);
+            }
 
+            Log.e("sizes", Arrays.asList(sortedPoints).toString() + " " + ((int)(sortedPoints[0].x+ sortedPoints[1].x)^2));
+            double maxY = 0;
+            double maxX = 0;
+            double widthTop = Math.sqrt(Math.pow(sortedPoints[0].x - sortedPoints[1].x, 2) + Math.pow(sortedPoints[0].y - sortedPoints[1].y, 2));
+            double widthBottom = Math.sqrt(Math.pow(sortedPoints[2].x - sortedPoints[3].x, 2) + Math.pow(sortedPoints[2].y - sortedPoints[3].y, 2));
+            double heightLeft = Math.sqrt(Math.pow(sortedPoints[0].x - sortedPoints[2].x, 2) + Math.pow(sortedPoints[0].y - sortedPoints[2].y, 2));
+            double heightRight = Math.sqrt(Math.pow(sortedPoints[1].x - sortedPoints[3].x, 2) + Math.pow(sortedPoints[1].y - sortedPoints[3].y, 2));
 
+            if(widthTop > widthBottom){
+                maxX = widthTop;
+            } else {
+                maxX = widthBottom;
+            }
+
+            if(heightLeft > heightRight){
+                maxY = heightLeft;
+            } else {
+                maxY = heightRight;
+            }
+            Log.e("sizes", widthTop +" " + widthBottom + " " + heightLeft + " " + heightRight);
 
 
             MatOfPoint2f src = new MatOfPoint2f(
                     sortedPoints
             );
+
 
 
 
@@ -511,18 +505,15 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                     new Point(0,maxY),
                     new Point(maxX,maxY)
             );
-
             Mat warpMat = Imgproc.getPerspectiveTransform(src,dst);
             //This is you new image as Mat
             Mat destImage = new Mat();
             Imgproc.warpPerspective(frame, destImage, warpMat, new org.opencv.core.Size(maxX, maxY));
 
-
             /*Bitmap bmp = Bitmap.createBitmap(destImage.cols(), destImage.rows(), Bitmap.Config.ARGB_8888);
             Utils.matToBitmap(destImage, bmp);*/
             //File destination = new File(getTempDirectoryPath() + "/" + System.currentTimeMillis() + "/" + source.getName());
 
-            Log.e("success", "success " + frame.width() + " " + frame.height());
             String newPath = this.cachePath + "/" + System.currentTimeMillis() + "/";
             File dir = new File(newPath);
             if(!dir.exists())
@@ -533,10 +524,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             } else {
                 Log.e("savedfilde", "no");
             }
-
-
-
             Intent data = new Intent();
+            Log.e("success", "success " + frame.width() + " " + frame.height());
 
             data.putExtra("path", destination);
 
@@ -600,10 +589,11 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
 
 
-
+        Mat blurredImage = new Mat();
+        Mat hsvImage = new Mat();
+        Mat morphOutput = new Mat();
 
         Mat frame = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
-
 
         Mat gray = Imgcodecs.imdecode(new MatOfByte(imageBytes), Imgcodecs.CV_LOAD_IMAGE_GRAYSCALE);
         Core.transpose(frame, frame);
@@ -612,29 +602,56 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
         Core.transpose(gray, gray);
         Core.flip(gray, gray, 1);
-       // org.opencv.core.Core.flip(frame, frame, -1);
-        //org.opencv.core.Core.flip(gray, gray, -1);
+        Mat mask = new Mat();
+        //Imgproc.cvtColor(frame, mask, Imgproc.COLOR_RGB2HSV);
 
 
 
-        Imgproc.blur(gray, frame, new org.opencv.core.Size(5, 5));
+        Imgproc.blur(gray, gray, new org.opencv.core.Size(2, 2));
+        Imgproc.Canny(gray, mask, treshHold1, 40, 3, false);
 
+        Imgproc.dilate(mask, mask, new Mat(), new Point(-1, 1), 2);
+        Imgproc.erode(mask, mask, new Mat(), new Point(-1, -1), 2);
 
-
-        //Imgproc.threshold(mRgba, mRgba, 125, 200, Imgproc.THRESH_BINARY);
-       // Log.d("treshhold", String.valueOf(treshHold1) + " " + String.valueOf(treshHold2));
-
-        Imgproc.Canny(frame, frame, treshHold1, treshHold2, 3, false);
-
-
-        Imgproc.dilate(frame, frame, new Mat(), new Point(-1, 1), 1);
-
-
-        Bitmap bmp = Bitmap.createBitmap(frame.cols(), frame.rows(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(frame, bmp);
+        frame = mask;
+        Bitmap bmp = Bitmap.createBitmap(mask.cols(), mask.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(mask, bmp);
 
 
         drawOpencv(bmp);
+        //Imgproc.blur(mask, mask, new org.opencv.core.Size(5, 5));
+        // org.opencv.core.Core.flip(frame, frame, -1);
+        //org.opencv.core.Core.flip(gray, gray, -1);
+
+
+        //Imgproc.cvtColor(mask, mask, Imgproc.COLOR_BGR2GRAY);
+
+        //Imgproc.threshold(gray, morphOutput, treshHold1, 200, Imgproc.THRESH_BINARY_INV);
+       // Log.d("treshhold", String.valueOf(treshHold1) + " " + String.valueOf(treshHold2));
+
+       //
+
+        //Imgproc.blur(mask, mask, new org.opencv.core.Size(5, 5));
+        //Imgproc.erode(mask, mask, new Mat(), new Point(-1, -1), 3);
+
+
+
+
+        //Imgproc.Canny(mask, mask, treshHold1, 40, 3, false);
+
+        //Imgproc.dilate(gray, gray, new Mat(), new Point(-1, 1), 1);
+
+
+        //Imgproc.dilate(gray, gray, new Mat(), new Point(-1, 1), 2);
+
+
+
+
+
+
+
+
+
 
         List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchy = new Mat();
@@ -656,37 +673,42 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
            // drawOpencv(bmp);
 
             org.opencv.core.Rect largestRect = null;
+            org.opencv.core.Rect rect = null;
             MatOfPoint2f shape = null;
+
             for (MatOfPoint contour : contours) {
                 RotatedRect boundingRect = Imgproc.minAreaRect(new MatOfPoint2f(contour.toArray()));
 
                 double rectangleArea = boundingRect.size.area();
 
                 // test min ROI area in pixels
-                if (rectangleArea > 100) {
+                if (rectangleArea > 250000) {
                     Point rotated_rect_points[] = new Point[4];
                     boundingRect.points(rotated_rect_points);
-                    org.opencv.core.Rect rect = Imgproc.boundingRect(new MatOfPoint(rotated_rect_points));
+                    rect = Imgproc.boundingRect(new MatOfPoint(rotated_rect_points));
 
 
                     double contourArea = Imgproc.contourArea(contour);
 
                     MatOfPoint2f approx = new MatOfPoint2f();
                     Imgproc.approxPolyDP(new MatOfPoint2f(contour.toArray()), approx, Imgproc.arcLength(new MatOfPoint2f(contour.toArray()), true) * 0.02, true);
+
                     long count = approx.total();
 
                     Log.d("countsies", String.valueOf(count));
-
-                    if (largestRect == null) {
-                        shape = approx;
-                        largestRect = rect;
-                    } else {
-                        if (rect.width > largestRect.width && maxVal < contourArea) {
-                            maxVal = contourArea;
-                            largestRect = rect;
+                    if(count == 4){
+                        if (largestRect == null) {
                             shape = approx;
+                            largestRect = rect;
+                        } else {
+                            if (rect.width > largestRect.width && maxVal < contourArea) {
+                                maxVal = contourArea;
+                                largestRect = rect;
+                                shape = approx;
+                            }
                         }
                     }
+
 
                 }
             }
@@ -697,10 +719,53 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
 
                 // TODO get shape with > 5 angles and find the biggest square
-                if(shape.total() == 4){
-                    List<Point> points = shape.toList();
 
+                    List<Point> points = shape.toList();
+                    List<Point> drawPoints = shape.toList();;
                     Collections.sort(points, new Comparator<Point>() {
+                        @Override
+                        public int compare(Point o1, Point o2) {
+                            if(o1.x > o2.x){
+
+                                return 1;
+                            } else if(o1.x == o2.x){
+                                if(o1.y > o2.y){
+                                    return 1;
+                                } else {
+                                    return -1;
+                                }
+                            }
+
+
+                            return -1;
+                        }
+                    });
+
+
+                    Point[] sortedPoints = new Point[4];
+
+                    if(points.get(0).y > points.get(1).y){
+                        sortedPoints[0] = points.get(1);
+                        sortedPoints[2] = points.get(0);
+                    } else {
+                        sortedPoints[0] = points.get(0);
+                        sortedPoints[2] = points.get(1);
+                    }
+
+                    if(points.get(2).y > points.get(3).y){
+                        sortedPoints[1] = points.get(3);
+                        sortedPoints[3] = points.get(2);
+                    } else {
+                        sortedPoints[1] = points.get(2);
+                        sortedPoints[3] = points.get(3);
+                    }
+
+
+                double cos1 = Math.abs(this.getCos(sortedPoints[0], sortedPoints[1]));
+                double cos2 = Math.abs(this.getCos(sortedPoints[2], sortedPoints[3]));
+
+                if(cos1 > 0.80 && cos2 > 0.80){
+                    Collections.sort(drawPoints, new Comparator<Point>() {
                         @Override
                         public int compare(Point o1, Point o2) {
                             if(o1.x < o2.x && o1.y < o2.y){
@@ -709,9 +774,17 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                             return 0;
                         }
                     });
-                    Draw(points);
+                    Draw(drawPoints);
                 }
+
+
             }
         }
+    }
+
+    private double getCos(Point p1, Point p2){
+        double length = Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+
+        return (p1.x - p2.x) / length;
     }
 }

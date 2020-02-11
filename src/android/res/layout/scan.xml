@@ -33,13 +33,6 @@
         android:max="300"
         android:progress="75" />
 
-    <SeekBar
-        android:id="@+id/seekBar1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom|center"
-        android:max="300"
-        android:progress="130" />
 
     <!--<org.opencv.android.JavaCameraView
         android:id="@+id/cameraViewer"
