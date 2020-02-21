@@ -13,16 +13,16 @@
 
     <SurfaceView
         android:id="@+id/SurfaceView03"
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="200dp"
+        android:layout_height="300dp"
         android:layout_gravity="end"
-        android:layout_margin="10dp"
         android:max="100"
         android:progress="3"></SurfaceView>
 
     <Button android:text="@+id/Button01" android:id="@+id/Button01"
         android:layout_width="wrap_content" android:layout_height="wrap_content">
     </Button>
+
 
     <SeekBar
         android:id="@+id/seekBar"
@@ -31,11 +31,77 @@
         android:layout_gravity="bottom|center"
         android:layout_marginBottom="30dp"
         android:max="300"
-        android:progress="75" />
+        android:progress="50"
+        android:visibility="invisible" />
 
+    <SeekBar
+        android:id="@+id/seekBar2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:layout_marginBottom="60dp"
+        android:max="255"
+        android:progress="200"
+        android:visibility="invisible" />
 
-    <!--<org.opencv.android.JavaCameraView
-        android:id="@+id/cameraViewer"
+    <TextView
+        android:id="@+id/textViewB"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"></org.opencv.android.JavaCameraView>-->
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:layout_marginBottom="90dp"
+        android:text="TextView"
+        android:textColor="@android:color/white"
+        android:visibility="invisible" />
+
+    <Button
+        android:id="@+id/buttonPlusB"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="90dp"
+        android:onClick="onClick"
+        android:text="+"
+        android:visibility="invisible" />
+
+    <Button
+        android:id="@+id/buttonMinusB"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="90dp"
+        android:onClick="onClick"
+        android:text="-"
+        android:visibility="invisible" />
+
+
+    <TextView
+        android:id="@+id/textViewC"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:layout_marginBottom="150dp"
+        android:text="TextView"
+        android:textColor="@android:color/white"
+        android:visibility="invisible" />
+
+    <Button
+        android:id="@+id/buttonPlusC"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="150dp"
+        android:onClick="onClick"
+        android:text="+"
+        android:visibility="invisible" />
+
+    <Button
+        android:id="@+id/buttonMinusC"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="150dp"
+        android:onClick="onClick"
+        android:text="-"
+        android:visibility="invisible" />
 </FrameLayout>

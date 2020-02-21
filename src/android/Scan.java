@@ -29,7 +29,7 @@ import static android.app.Activity.RESULT_OK;
 /**
  * This class echoes a string called from JavaScript.
  */
-public class Scan extends CordovaPlugin {
+public class  Scan extends CordovaPlugin {
     public CallbackContext callbackContext;
     protected final static String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE};
     private Context context;
