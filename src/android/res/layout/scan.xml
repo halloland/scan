@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout android:id="@+id/FrameLayout01"
+<FrameLayout xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/FrameLayout01"
     android:layout_width="fill_parent" android:layout_height="fill_parent"
     xmlns:android="http://schemas.android.com/apk/res/android">
     <SurfaceView android:id="@+id/SurfaceView01"
@@ -18,10 +19,6 @@
         android:layout_gravity="end"
         android:max="100"
         android:progress="3"></SurfaceView>
-
-    <Button android:text="@+id/Button01" android:id="@+id/Button01"
-        android:layout_width="wrap_content" android:layout_height="wrap_content">
-    </Button>
 
 
     <SeekBar
@@ -104,4 +101,28 @@
         android:onClick="onClick"
         android:text="-"
         android:visibility="invisible" />
+
+    <halloland.scan.RectangleView
+        android:id="@+id/rectangle"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="visible" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="@android:style/Widget.DeviceDefault.Light.ProgressBar.Large"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:maxWidth="100dp"
+        android:minWidth="100dp"
+        android:visibility="invisible" />
+
+    <Button
+        android:id="@+id/Button01"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center"
+        android:text="@+id/Button01"
+        android:visibility="visible" />
 </FrameLayout>
