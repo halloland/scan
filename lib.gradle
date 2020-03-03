@@ -1,5 +1,5 @@
 dependencies {
-    implementation fileTree(dir: 'src\\main\\libs', include: ['*.aar', '*.jar'], exclude: [])
+    implementation fileTree(dir: 'src\\libs', include: ['*.aar', '*.jar'], exclude: [])
 }
 repositories {
     flatDir{
