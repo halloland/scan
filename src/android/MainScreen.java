@@ -286,7 +286,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         if (biggestSize != null) {
             Log.e("biggest size", biggestSize.width + "x" + biggestSize.height);
             Camera.Parameters params = camera.getParameters();
-            params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+         //   params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
             params.setPictureSize(biggestSize.width, biggestSize.height);
             camera.setParameters(params);
         } else {
@@ -499,7 +499,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
-//        camera.autoFocus(this);
+        camera.autoFocus(this);
 
         return super.onTouchEvent(event);
 
