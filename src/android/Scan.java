@@ -31,7 +31,7 @@ import static android.app.Activity.RESULT_OK;
  */
 public class  Scan extends CordovaPlugin {
     public CallbackContext callbackContext;
-    protected final static String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE};
+    protected final static String[] permissions = {Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.CAMERA};
     private Context context;
     private JSONArray options;
 
@@ -68,7 +68,8 @@ public class  Scan extends CordovaPlugin {
     private boolean checkPermissions() {
 
         return PermissionHelper.hasPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE)
-                && PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+                && PermissionHelper.hasPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                && PermissionHelper.hasPermission(this, Manifest.permission.CAMERA);
 
     }
 
@@ -86,15 +87,7 @@ public class  Scan extends CordovaPlugin {
 
     private void openNewActivity() {
         Scan that = this;
-        File[] files = this.cordova.getActivity().getApplicationContext().getExternalFilesDirs(null);
-        String sdCardPath = null;
-        for (File file : files){
-            String rootPath = file.getPath().split("/Android")[0];
-            File rootFile = new File(rootPath);
-            if(Environment.isExternalStorageRemovable(rootFile)){
-                sdCardPath = rootFile.getAbsolutePath();
-            }
-        }
+
         Intent intent = new Intent(context, MainScreen.class);
         if(this.options != null){
             intent.putExtra("options", this.options.toString());
@@ -112,12 +105,17 @@ public class  Scan extends CordovaPlugin {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent intent) {
         if (resultCode == RESULT_OK) {
-            String path = intent.getStringExtra("path");
-            File source = new File(path);
+            String[] paths = intent.getStringArrayExtra("paths");
+            JSONArray uris = new JSONArray();
 
-            Uri resultUri = Uri.fromFile(source);
+            for (int i = 0; i < paths.length; i ++){
+                File source = new File(paths[i]);
 
-            callbackContext.success(resultUri.toString());
+                Uri resultUri = Uri.fromFile(source);
+                uris.put(resultUri);
+            }
+
+            callbackContext.success(uris);
 
 
 
@@ -126,30 +124,6 @@ public class  Scan extends CordovaPlugin {
         }
     }
 
-    private static void copyFile(File sourceFile, File destFile) throws IOException {
-        if (!destFile.getParentFile().exists())
-            destFile.getParentFile().mkdirs();
-
-        if (!destFile.exists()) {
-            destFile.createNewFile();
-        }
-
-        FileChannel source = null;
-        FileChannel destination = null;
-
-        try {
-            source = new FileInputStream(sourceFile).getChannel();
-            destination = new FileOutputStream(destFile).getChannel();
-            destination.transferFrom(source, 0, source.size());
-        } finally {
-            if (source != null) {
-                source.close();
-            }
-            if (destination != null) {
-                destination.close();
-            }
-        }
-    }
 
     private String getTempDirectoryPath() {
         File cache = null;

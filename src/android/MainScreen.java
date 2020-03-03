@@ -6,22 +6,16 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ImageFormat;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
 import android.graphics.pdf.PdfDocument;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
-import android.opengl.Visibility;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -31,27 +25,23 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
-import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 public class MainScreen extends Activity implements SurfaceHolder.Callback, View.OnClickListener, Camera.PictureCallback, Camera.PreviewCallback, Camera.AutoFocusCallback {
@@ -69,22 +59,27 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
     private SurfaceView preview;
     private Button shotBtn;
+    private Button autoBtn;
+    private Button doneBtn;
+    private TextView waitText;
 
+    private RectangleSearcher rectangleSearcher;
 
     private double ratio = 1.00;
 
     private float ratioHeight = 0;
     private float ratioWidth = 0;
 
-    private int linesThreshold = 200;
+    private int linesThreshold = 255;
 
     boolean finished = true;
-    private Mat srcMat;
 
     private List<Point> lastPoints;
     private int counter = 0;
     private String cachePath;
     private boolean disabled = false;
+
+    private boolean automatic = true;
 
     private List<Mat> pages = new ArrayList<>();
 
@@ -143,9 +138,20 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
 
         shotBtn = (Button) findViewById(this.getResourceId("Button01", "id"));
-        shotBtn.setText("Shot");
 
+        doneBtn = (Button) findViewById(this.getResourceId("buttonFinish", "id"));
+
+        autoBtn = (Button) findViewById(this.getResourceId("button", "id"));
+
+        waitText = (TextView) findViewById(this.getResourceId("textView", "id"));
+
+        doneBtn.setOnClickListener(this);
+        autoBtn.setOnClickListener(this);
         shotBtn.setOnClickListener(this);
+
+        this.rectangleSearcher = new RectangleSearcher();
+
+
     }
 
 
@@ -168,8 +174,9 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     }
 
 
-    private void drawOpencv(Bitmap image) {
-
+    private void drawOpencv(Mat image) {
+        Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(image, bmp);
         try {
             Canvas canvas = holderOpencv.lockCanvas(null);
             canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
@@ -179,7 +186,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                 Paint p = new Paint();
                 p.setColor(Color.RED);
                 canvas.drawColor(Color.RED);
-                canvas.drawBitmap(Bitmap.createScaledBitmap(image, opencvView.getWidth(), opencvView.getHeight(), false), 0, 0, p);
+                canvas.drawBitmap(Bitmap.createScaledBitmap(bmp, opencvView.getWidth(), opencvView.getHeight(), false), 0, 0, p);
             }
 
             holderOpencv.unlockCanvasAndPost(canvas);
@@ -191,13 +198,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     }
 
 
-    public List<Point> cloneList(List<Point> list) {
-        List<Point> clone = new ArrayList<Point>(list.size());
-        for (Point item : list) clone.add(item.clone());
-        return clone;
-    }
-
-    private void DrawOnUi(List<Point> list){
+    private void DrawOnUi(List<Point> list) {
         context.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -211,7 +212,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         lastPoints = points;
 
         if (points != null) {
-            List<Point> scaledPoints = cloneList(points);
+            List<Point> scaledPoints = PointsHelper.cloneListPoints(points);
 
             for (int i = 0; i < scaledPoints.size(); i++) {
                 Point point = scaledPoints.get(i);
@@ -285,6 +286,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         if (biggestSize != null) {
             Log.e("biggest size", biggestSize.width + "x" + biggestSize.height);
             Camera.Parameters params = camera.getParameters();
+            params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
             params.setPictureSize(biggestSize.width, biggestSize.height);
             camera.setParameters(params);
         } else {
@@ -315,6 +317,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
         preview.setLayoutParams(lp);
         camera.startPreview();
+        camera.autoFocus(this);
     }
 
     @Override
@@ -326,12 +329,88 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     public void onClick(View v) {
         if (v == shotBtn) {
             this.disabled = true;
-            progressBar.setVisibility(View.GONE);
-            progressBar.setVisibility(View.VISIBLE);
-
+            showLoader();
+            hideShotBtn();
+            hideWaitText();
 
             camera.takePicture(null, null, null, this);
+        } else if(v == autoBtn) {
+            automatic = !automatic;
+            if(!automatic){
+                autoBtn.setTextColor(Color.parseColor("#696969"));
+                counter = 0;
+            } else {
+                autoBtn.setTextColor(Color.parseColor("#FFFFFF"));
+            }
+
+        } else {
+            this.done();
         }
+    }
+
+    private void done(){
+
+
+            /*
+            if (Imgcodecs.imwrite(destination, destImage)) {
+                Log.e("savedfilde", "yes");
+            } else {
+                Log.e("savedfilde", "no");
+            }*/
+        Log.d("doneexecute", "test");
+
+
+       // PdfDocument document = new PdfDocument();
+        String[] filePathes = new String[pages.size()];
+
+        for (int i = 0; i < pages.size(); i++) {
+            Mat image = pages.get(i);
+
+            String newPath = cachePath + "/" + System.currentTimeMillis() + i + "/";
+            File dir = new File(newPath);
+            if (!dir.exists())
+                dir.mkdirs();
+            String destination = newPath + "original_document.jpg";
+            filePathes[i] = destination;
+            if (Imgcodecs.imwrite(destination, image)) {
+                Log.e("savedfilde", "yes");
+            } else {
+                Log.e("savedfilde", "no");
+            }
+            /*PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(image.width(), image.height(), i + 1).create();
+            PdfDocument.Page page = document.startPage(pageInfo);*/
+/*
+            Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
+            Utils.matToBitmap(image, bmp);
+            *//*drawOpencv(bmp);*//*
+            image.release();*/
+
+          /*  page.getCanvas().drawBitmap(bmp, 0, 0, null);
+            document.finishPage(page);*/
+        }
+
+        Intent data = new Intent();
+
+        data.putExtra("paths", filePathes);
+
+
+        /*File file = new File(newPath, "original_document.pdf");
+
+
+        try {
+            FileOutputStream fileOutputStream = new FileOutputStream(file);
+
+            document.writeTo(fileOutputStream);
+            fileOutputStream.flush();
+            fileOutputStream.close();
+        } catch (Exception e) {
+            Log.e("hallolandError", Arrays.asList(e.getStackTrace()).toString());
+
+        }*/
+
+
+        setResult(RESULT_OK, data);
+        finish();
     }
 
     @Override
@@ -340,107 +419,64 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             @Override
             public void run() {
                 try {
-
-                    Mat frame = Imgcodecs.imdecode(new MatOfByte(paramArrayOfByte), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+                    Mat frame = Imgcodecs.imdecode(new MatOfByte(paramArrayOfByte), Imgcodecs.IMREAD_UNCHANGED);
                     Core.transpose(frame, frame);
                     Core.flip(frame, frame, 1);
                     Imgproc.cvtColor(frame, frame, Imgproc.COLOR_BGR2RGB);
 
+                    Mat destImage = null;
+                    if(lastPoints != null){
+                        for (int i = 0; i < lastPoints.size(); i++) {
+                            Point point = lastPoints.get(i);
+                            point.x *= ratioWidth * (float) frame.width() / (float) preview.getWidth(); //(double) (frame.width() / srcMat.width());
+                            point.y *= ratioHeight * (float) frame.height() / (float) preview.getHeight();///(double) (frame.height() / srcMat.height());
+                        }
 
+                        org.opencv.core.Size resultSize = MatHelper.calculateFrameSizeFromPoints(lastPoints, ratio);
 
-                    for (int i = 0; i < lastPoints.size(); i++) {
-                        Point point = lastPoints.get(i);
-                        point.x *= ratioWidth * (float) frame.width() / (float) preview.getWidth(); //(double) (frame.width() / srcMat.width());
-                        point.y *= ratioHeight * (float) frame.height() / (float) preview.getHeight();///(double) (frame.height() / srcMat.height());
+                        MatOfPoint2f src = new MatOfPoint2f(
+                                (Point[]) lastPoints.toArray()
+                        );
+
+                        MatOfPoint2f dst = new MatOfPoint2f(
+                                new Point(0, 0),
+                                new Point(resultSize.width, 0),
+                                new Point(0, resultSize.height),
+                                new Point(resultSize.width, resultSize.height)
+                        );
+                        Mat warpMat = Imgproc.getPerspectiveTransform(src, dst);
+                        destImage = new Mat();
+                        Imgproc.warpPerspective(frame, destImage, warpMat, resultSize);
+                    } else {
+                        destImage = frame;
                     }
-
-                    org.opencv.core.Size resultSize = getResultFrameSize(lastPoints);
-
-                    MatOfPoint2f src = new MatOfPoint2f(
-                            (Point[]) lastPoints.toArray()
-                    );
-
-                    MatOfPoint2f dst = new MatOfPoint2f(
-                            new Point(0, 0),
-                            new Point(resultSize.width, 0),
-                            new Point(0, resultSize.height),
-                            new Point(resultSize.width, resultSize.height)
-                    );
-                    Mat warpMat = Imgproc.getPerspectiveTransform(src, dst);
-                    Mat destImage = new Mat();
-                    Imgproc.warpPerspective(frame, destImage, warpMat, resultSize);
 
 
                     pages.add(destImage);
 
-                    if (pages.size() == 2) {
-                        String newPath = cachePath + "/" + System.currentTimeMillis() + "/";
-                        File dir = new File(newPath);
-                        if (!dir.exists())
-                            dir.mkdirs();
-                        String destination = newPath + "original_document.pdf";
-
-            /*
-            if (Imgcodecs.imwrite(destination, destImage)) {
-                Log.e("savedfilde", "yes");
-            } else {
-                Log.e("savedfilde", "no");
-            }*/
-                        Intent data = new Intent();
-
-                        data.putExtra("path", destination);
 
 
-                        PdfDocument document = new PdfDocument();
 
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            hideLoader();
+                            Draw(null);
+                            rectangleView.clear();
 
-                        for (int i = 0; i < pages.size(); i++) {
-                            Mat image = pages.get(i);
-
-                            PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(image.width(), image.height(), i + 1).create();
-                            PdfDocument.Page page = document.startPage(pageInfo);
-
-                            Bitmap bmp = Bitmap.createBitmap(image.cols(), image.rows(), Bitmap.Config.ARGB_8888);
-                            Utils.matToBitmap(image, bmp);
-                            /*drawOpencv(bmp);*/
-
-                            page.getCanvas().drawBitmap(bmp, 0, 0, null);
-                            document.finishPage(page);
-                        }
-
-
-                        File file = new File(newPath, "original_document.pdf");
-
-
-                        try {
-                            FileOutputStream fileOutputStream = new FileOutputStream(file);
-
-                            document.writeTo(fileOutputStream);
-                            fileOutputStream.flush();
-                            fileOutputStream.close();
-                        } catch (Exception e) {
-                            Log.e("hallolandError", Arrays.asList(e.getStackTrace()).toString());
-
-                        }
-
-
-                        setResult(RESULT_OK, data);
-                        finish();
-                    } else {
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                progressBar.setVisibility(View.GONE);
-                                progressBar.setVisibility(View.INVISIBLE);
-                                Draw(null);
-                                rectangleView.clear();
-
-                                camera.startPreview();
-
+                            camera.startPreview();
+                            camera.autoFocus(context);
+                            if(pages.size() == 1){
+                                doneBtn.setVisibility(View.GONE);
+                                doneBtn.setVisibility(View.VISIBLE);
                             }
-                        });
-                        disabled = false;
-                    }
+                            showShotBtn();
+
+                        }
+                    });
+
+                    counter = 0;
+                    disabled = false;
 
 
                 } catch (Exception e) {
@@ -450,160 +486,26 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         }.start();
     }
 
-    private org.opencv.core.Size getResultFrameSize(List<Point> rectPoints) {
-        Point[] sortedPoints = (Point[]) rectPoints.toArray();
-        double maxY = 0;
-        double maxX = 0;
-        double widthTop = Math.sqrt(Math.pow(sortedPoints[0].x - sortedPoints[1].x, 2) + Math.pow(sortedPoints[0].y - sortedPoints[1].y, 2));
-        double widthBottom = Math.sqrt(Math.pow(sortedPoints[2].x - sortedPoints[3].x, 2) + Math.pow(sortedPoints[2].y - sortedPoints[3].y, 2));
-        double heightLeft = Math.sqrt(Math.pow(sortedPoints[0].x - sortedPoints[2].x, 2) + Math.pow(sortedPoints[0].y - sortedPoints[2].y, 2));
-        double heightRight = Math.sqrt(Math.pow(sortedPoints[1].x - sortedPoints[3].x, 2) + Math.pow(sortedPoints[1].y - sortedPoints[3].y, 2));
-
-        maxX = (widthBottom + widthTop) / 2;
-        maxY = (heightLeft + heightRight) / 2;
-
-        return new org.opencv.core.Size(maxX * this.ratio, maxY * this.ratio);
-    }
 
     @Override
     public void onAutoFocus(boolean paramBoolean, Camera paramCamera) {
-       /* if (paramBoolean) {
-
-        }*/
+        if (paramBoolean) {
+           /* if(!paramBoolean){
+                paramCamera.autoFocus(this);
+            }*/
+        }
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
 
-        camera.autoFocus(this);
+//        camera.autoFocus(this);
 
         return super.onTouchEvent(event);
 
     }
 
-
-    private Mat getMatFromFrameData(byte[] data) {
-        int width = 0;
-        int height = 0;
-        Camera.Parameters parameters = camera.getParameters();
-
-        height = parameters.getPreviewSize().height;
-
-        width = parameters.getPreviewSize().width;
-
-        YuvImage yuvImage = new YuvImage(data, ImageFormat.NV21,
-                width, height, null);
-
-        Rect rectangle = new Rect(0, 0, width, height);
-        ByteArrayOutputStream out =
-                new ByteArrayOutputStream();
-
-
-        yuvImage.compressToJpeg(rectangle, 100, out);
-
-        byte[] imageBytes = out.toByteArray();
-
-
-        Bitmap image = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-
-        this.ratio = (double) width / 800;
-
-        Bitmap resized = Bitmap.createScaledBitmap(image, (int) (width / ratio), (int) (height / this.ratio), true);
-
-        Mat mat = new Mat(resized.getWidth(), resized.getHeight(), CvType.CV_8UC1);
-        Bitmap bmp32 = resized.copy(Bitmap.Config.ARGB_8888, true);
-        Utils.bitmapToMat(bmp32, mat);
-
-        return mat;
-    }
-
-
-    private Mat applyFilters(Mat frame) {
-        Mat mask = new Mat();
-        Imgproc.medianBlur(frame, mask, 33);
-        Imgproc.cvtColor(mask, mask, Imgproc.COLOR_BGR2GRAY);
-
-        Imgproc.adaptiveThreshold(mask, mask, 255, Imgproc.ADAPTIVE_THRESH_GAUSSIAN_C, Imgproc.THRESH_BINARY_INV, 17, 2);
-        Mat element = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new org.opencv.core.Size(3, 3));
-
-        Imgproc.erode(mask, mask, element);
-        Imgproc.dilate(mask, mask, element);
-
-
-        return mask;
-    }
-
-
-    private Point getLinesIntersectionPoint(Point A, Point B, Point C, Point D) {
-        double a1 = B.y - A.y;
-        double b1 = A.x - B.x;
-        double c1 = a1 * (A.x) + b1 * (A.y);
-
-        double a2 = D.y - C.y;
-        double b2 = C.x - D.x;
-        double c2 = a2 * (C.x) + b2 * (C.y);
-
-        double determinant = a1 * b2 - a2 * b1;
-
-        if (determinant == 0) {
-
-            return new Point(Double.MAX_VALUE, Double.MAX_VALUE);
-        } else {
-            double x = (b2 * c1 - b1 * c2) / determinant;
-            double y = (a1 * c2 - a2 * c1) / determinant;
-            return new Point(x, y);
-        }
-    }
-
-
-    private List<Point> sortRectPoints(List<Point> sourcePoints) {
-        List<Point> points = new ArrayList<>(sourcePoints);
-        Collections.sort(points, new Comparator<Point>() {
-            @Override
-            public int compare(Point o1, Point o2) {
-                if (o1.x > o2.x) {
-
-                    return 1;
-                } else if (o1.x == o2.x) {
-                    if (o1.y > o2.y) {
-                        return 1;
-                    } else {
-                        return -1;
-                    }
-                }
-
-
-                return -1;
-            }
-        });
-
-        Point[] sortedPoints = new Point[4];
-
-        if (points.get(0).y > points.get(1).y) {
-            sortedPoints[0] = points.get(1);
-            sortedPoints[2] = points.get(0);
-        } else {
-            sortedPoints[0] = points.get(0);
-            sortedPoints[2] = points.get(1);
-        }
-
-        if (points.get(2).y > points.get(3).y) {
-            sortedPoints[1] = points.get(3);
-            sortedPoints[3] = points.get(2);
-        } else {
-            sortedPoints[1] = points.get(2);
-            sortedPoints[3] = points.get(3);
-        }
-
-        return Arrays.asList(sortedPoints);
-    }
-
-    public double getLineLength(Point p1, Point p2){
-        return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
-    }
-
-
-    public void setLoaderVisibility(int visibility){
+    public void setLoaderVisibility(int visibility) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -613,12 +515,51 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         });
     }
 
-    public void hideLoader(){
+    public void hideLoader() {
         setLoaderVisibility(View.INVISIBLE);
     }
 
-    public void showLoader(){
+    public void showLoader() {
         setLoaderVisibility(View.VISIBLE);
+    }
+
+    public void setShotBtnVisibility(int visibility){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                shotBtn.setVisibility(View.GONE);
+                shotBtn.setVisibility(visibility);
+            }
+        });
+    }
+
+    public void showShotBtn(){
+        setShotBtnVisibility(View.VISIBLE);
+
+    }
+
+    public void hideShotBtn(){
+        setShotBtnVisibility(View.INVISIBLE);
+    }
+
+
+    public void setWaitTextVisibility(int visibility){
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                waitText.setVisibility(View.GONE);
+                waitText.setVisibility(visibility);
+            }
+        });
+    }
+
+    public void showWaitText(){
+        setWaitTextVisibility(View.VISIBLE);
+
+    }
+
+    public void hideWaitText(){
+        setWaitTextVisibility(View.INVISIBLE);
     }
 
     @Override
@@ -633,27 +574,27 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             Thread thread = new Thread() {
                 @Override
                 public void run() {
+                    Camera.Parameters parameters = camera.getParameters();
 
-                    Mat frame = getMatFromFrameData(data);
+                    int height = parameters.getPreviewSize().height;
 
-                    // Rotate image
-                    Core.transpose(frame, frame);
-                    Core.flip(frame, frame, 1);
-                    srcMat = frame.clone();
+                    int width = parameters.getPreviewSize().width;
+                    ratio = (double) width / 800;
+                    Mat frame = MatHelper.rotate(MatHelper.getMatFromData(data, width, height, ratio));
+                    Mat mask = MatHelper.applyFilters(frame);
 
+                   // drawOpencv(mask);
 
-                    Mat mask = applyFilters(frame);
-                    finished = true;
 
                     if (!mask.empty()) {
                         List<Point> rectangle = findBiggestRectangle(mask);
                         if (rectangle != null) {
-                            if (lastPoints != null) {
-                                List<Point> points = sortRectPoints(lastPoints);
-                                List<Point> newPoints = sortRectPoints(rectangle);
+                            if (lastPoints != null && automatic) {
+                                List<Point> points = RectangleSearcher.sortRectPoints(lastPoints);
+                                List<Point> newPoints = RectangleSearcher.sortRectPoints(rectangle);
                                 boolean canAddCounter = true;
-                                for (int i = 0; i < points.size(); i++){
-                                    if(getLineLength(points.get(i), newPoints.get(i)) > 10){
+                                for (int i = 0; i < points.size(); i++) {
+                                    if (GeometryTools.getLineLength(points.get(i), newPoints.get(i)) > 10) {
                                         canAddCounter = false;
                                     }
                                 }
@@ -665,10 +606,13 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                                     counter = 0;
                                 }
 
+
                                 if (counter == 5) {
                                     DrawOnUi(rectangle);
                                     showLoader();
                                     disabled = true;
+                                    hideWaitText();
+                                    hideShotBtn();
                                     camera.takePicture(null, null, null, context);
 
                                 }
@@ -677,10 +621,19 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
 
                         } else {
+                            lastPoints = null;
                             counter = 0;
                             DrawOnUi(null);
                         }
+                        if(counter == 2){
+                            showWaitText();
+                        } else if(counter == 0){
+                            hideWaitText();
+                        }
+
                     }
+
+                    finished = true;
                 }
             };
 
@@ -690,71 +643,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     }
 
 
-    private List<Point> getPoints(Mat mask, int treshHold) {
-        Mat lines = new Mat();
-        List<Pair<Point, Point>> linePoints = new ArrayList<>();
-
-
-        Imgproc.HoughLinesP(mask, lines, 1, Math.PI / 180, treshHold, 30, 10); // runs the actual detection
-
-
-        if (lines.rows() == 0 || lines.rows() > 55) {
-            return null;
-        }
-        for (int x = 0; x < lines.rows(); x++) {
-            double[] l = lines.get(x, 0);
-            double initialX = (l[2] - l[0]) * 100;
-            double initialY = (l[3] - l[1]) * 100;
-            linePoints.add(new Pair<>(new Point(l[0] - initialX, l[1] - initialY), new Point(l[2] + initialX, l[3] + initialY)));
-        }
-
-
-        List<Point> points = new ArrayList<Point>();
-        for (int i = 0; i < linePoints.size(); i++) {
-            Pair<Point, Point> point1 = linePoints.get(i);
-            for (int j = 0; j < linePoints.size(); j++) {
-                if (j != i) {
-                    Pair<Point, Point> point2 = linePoints.get(j);
-                    Point intersect = this.getLinesIntersectionPoint(point1.first, point1.second, point2.first, point2.second);
-                    if (intersect.x < mask.width() && intersect.y < mask.height() && !points.contains(intersect)) {
-                        double cos = Math.abs(this.getCos(
-                                new Point(point1.second.x - point1.first.x, point1.second.y - point1.first.y),
-                                new Point(point2.second.x - point2.first.x, point2.second.y - point2.first.y)
-                        ));
-
-
-                        if (cos <= 0.2) {
-                            points.add(intersect);
-                        }
-                    }
-
-                }
-            }
-        }
-
-        for (int i = 0; i < points.size(); i++) {
-            Point p1 = points.get(i);
-            for (int j = 0; j < points.size(); j++) {
-                if (j != i) {
-                    Point p2 = points.get(j);
-
-                    double distance = getLineLength(p1, p2);
-                    if (distance < 25) {
-                        points.remove(p2);
-                        j--;
-                    }
-
-                }
-            }
-        }
-
-        return points;
-
-
-    }
-
     private List<Point> findBiggestRectangle(Mat mask) {
-        List<Point> resultPoints = this.getPoints(mask, linesThreshold);
+        List<Point> resultPoints = PointsHelper.getEstimatedPoints(mask, linesThreshold);
 
 
         if (resultPoints == null) {
@@ -765,7 +655,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             while (resultPoints != null && resultPoints.size() < 4 && currentThreshHold > 40) {
 
                 currentThreshHold -= 10;
-                resultPoints = this.getPoints(mask, currentThreshHold);
+                resultPoints = PointsHelper.getEstimatedPoints(mask, currentThreshHold);
             }
         }
 
@@ -774,159 +664,19 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             return null;
         }
 
-
-        List<Point[]> contours = new ArrayList<>();
-
-        Point[] bestRectanle = null;
-        double maxArea = 0;
-
-        for (int firstPointIndex = 0; firstPointIndex < resultPoints.size(); firstPointIndex++) {
-            Point p1 = resultPoints.get(firstPointIndex);
-
-            for (int secondPointIndex = 0; secondPointIndex < resultPoints.size(); secondPointIndex++) {
-                if (firstPointIndex != secondPointIndex) {
+        Point[] bestRectangle = rectangleSearcher.getBiggestRectangleFromPoints(resultPoints);
 
 
-                    Point p2 = resultPoints.get(secondPointIndex);
-
-
-                    for (int thirdPointIndex = 0; thirdPointIndex < resultPoints.size(); thirdPointIndex++) {
-                        if (thirdPointIndex != firstPointIndex && thirdPointIndex != secondPointIndex) {
-                            Point p3 = resultPoints.get(thirdPointIndex);
-
-                            for (int fourthPointIndex = 0; fourthPointIndex < resultPoints.size(); fourthPointIndex++) {
-                                if (fourthPointIndex != firstPointIndex && fourthPointIndex != secondPointIndex && fourthPointIndex != thirdPointIndex) {
-                                    Point p4 = resultPoints.get(fourthPointIndex);
-
-                                    boolean duplicated = false;
-
-                                    for (int k = 0; k < contours.size(); k++) {
-                                        Point[] foundRect = contours.get(k);
-                                        int duplicatedPoints = 0;
-                                        for (Point point : foundRect) {
-                                            if (point == p1
-                                                    || point == p2
-                                                    || point == p3
-                                                    || point == p4
-                                            ) {
-
-                                                duplicatedPoints++;
-
-                                            }
-                                        }
-                                        if (duplicatedPoints == 4) {
-                                            duplicated = true;
-
-                                        }
-
-
-                                    }
-
-                                    if (!duplicated) {
-
-
-                                        Point intersect = this.getLinesIntersectionPoint(p1, p2, p3, p4);
-
-
-                                        if (intersect.x < srcMat.width() && intersect.y < srcMat.height()) {
-                                            Point[] pointx = new Point[4];
-                                            pointx[0] = p1;
-                                            pointx[1] = p2;
-                                            pointx[2] = p3;
-                                            pointx[3] = p4;
-                                            contours.add(pointx);
-
-                                            double lengthP1 = getLineLength(p1, p2);
-                                            double lengthP2 = getLineLength(p3, p4);
-                                            double ratio = lengthP1 / lengthP2;
-
-
-                                            if (ratio > 0.8 && ratio < 1.2) {
-
-                                                Point[] foundPoints = new Point[4];
-                                                foundPoints[0] = p1;
-                                                foundPoints[1] = p2;
-                                                foundPoints[2] = p3;
-                                                foundPoints[3] = p4;
-
-
-                                                foundPoints = (Point[]) sortRectPoints(Arrays.asList(foundPoints)).toArray();
-
-
-                                                double contourArea = Imgproc.contourArea(new MatOfPoint(foundPoints));
-
-                                                if (contourArea > maxArea && this.isValidRectanle(Arrays.asList(foundPoints))) {
-                                                    maxArea = contourArea;
-                                                    bestRectanle = foundPoints;
-                                                }
-
-
-                                            }
-
-                                        }
-                                    }
-                                }
-                            }
-
-                        }
-
-                    }
-                }
-
-            }
-        }
         List<Point> rectangle = null;
-        if (bestRectanle != null) {
-            rectangle = Arrays.asList(bestRectanle);
+        if (bestRectangle != null) {
+            rectangle = Arrays.asList(bestRectangle);
 
         }
-
 
         ratioHeight = (float) preview.getHeight() / mask.height();
         ratioWidth = (float) preview.getWidth() / mask.width();
 
 
         return rectangle;
-    }
-
-    private boolean isValidRectanle(List<Point> points) {
-        boolean allowed = true;
-
-
-        double cos1 = Math.abs(this.getCos(
-                new Point(points.get(2).x - points.get(0).x, points.get(2).y - points.get(0).y),
-                new Point(points.get(1).x - points.get(0).x, points.get(1).y - points.get(0).y)
-        ));
-
-        double cos2 = Math.abs(this.getCos(
-                new Point(points.get(3).x - points.get(2).x, points.get(3).y - points.get(2).y),
-                new Point(points.get(3).x - points.get(1).x, points.get(3).y - points.get(1).y)
-        ));
-
-        double cos3 = Math.abs(this.getCos(
-                new Point(points.get(3).x - points.get(1).x, points.get(3).y - points.get(1).y),
-                new Point(points.get(1).x - points.get(0).x, points.get(1).y - points.get(0).y)
-        ));
-
-        double cos4 = Math.abs(this.getCos(
-                new Point(points.get(3).x - points.get(2).x, points.get(3).y - points.get(2).y),
-                new Point(points.get(2).x - points.get(0).x, points.get(2).y - points.get(0).y)
-        ));
-
-
-        if (cos1 > 0.2 || cos2 > 0.2 || cos3 > 0.2 || cos4 > 0.2) {
-            allowed = false;
-        }
-
-
-        return allowed;
-    }
-
-    private double getCos(Point p1, Point p2) {
-        double dotProd = p1.x * p2.x + p1.y * p2.y;
-        double length1 = Math.sqrt(Math.pow(p1.x, 2) + Math.pow(p1.y, 2));
-        double length2 = Math.sqrt(Math.pow(p2.x, 2) + Math.pow(p2.y, 2));
-
-        return dotProd / (length1 * length2);
     }
 }
