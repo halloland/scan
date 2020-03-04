@@ -11,7 +11,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
-import android.graphics.pdf.PdfDocument;
 import android.hardware.Camera;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
@@ -38,7 +37,6 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -286,7 +284,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         if (biggestSize != null) {
             Log.e("biggest size", biggestSize.width + "x" + biggestSize.height);
             Camera.Parameters params = camera.getParameters();
-         //   params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
+            //params.setFocusMode(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE);
             params.setPictureSize(biggestSize.width, biggestSize.height);
             camera.setParameters(params);
         } else {
@@ -334,9 +332,9 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             hideWaitText();
 
             camera.takePicture(null, null, null, this);
-        } else if(v == autoBtn) {
+        } else if (v == autoBtn) {
             automatic = !automatic;
-            if(!automatic){
+            if (!automatic) {
                 autoBtn.setTextColor(Color.parseColor("#696969"));
                 counter = 0;
             } else {
@@ -348,7 +346,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         }
     }
 
-    private void done(){
+    private void done() {
 
 
             /*
@@ -357,26 +355,40 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
             } else {
                 Log.e("savedfilde", "no");
             }*/
-        Log.d("doneexecute", "test");
+        hideWaitText();
+        hideShotBtn();
+        showLoader();
+        doneBtn.setVisibility(View.GONE);
+        doneBtn.setVisibility(View.INVISIBLE);
+        disabled = true;
+        if (camera != null) {
+            camera.setPreviewCallback(null);
+            camera.stopPreview();
+            camera.release();
+            camera = null;
+        }
+        Draw(null);
 
+        new Thread() {
+            @Override
+            public void run() {
+                String[] filePathes = new String[pages.size()];
 
-       // PdfDocument document = new PdfDocument();
-        String[] filePathes = new String[pages.size()];
+                for (int i = 0; i < pages.size(); i++) {
+                    Mat image = pages.get(i);
 
-        for (int i = 0; i < pages.size(); i++) {
-            Mat image = pages.get(i);
-
-            String newPath = cachePath + "/" + System.currentTimeMillis() + i + "/";
-            File dir = new File(newPath);
-            if (!dir.exists())
-                dir.mkdirs();
-            String destination = newPath + "original_document.jpg";
-            filePathes[i] = destination;
-            if (Imgcodecs.imwrite(destination, image)) {
-                Log.e("savedfilde", "yes");
-            } else {
-                Log.e("savedfilde", "no");
-            }
+                    String newPath = cachePath + "/" + System.currentTimeMillis() + i + "/";
+                    File dir = new File(newPath);
+                    if (!dir.exists())
+                        dir.mkdirs();
+                    String destination = newPath + "original_document.jpg";
+                    filePathes[i] = destination;
+                    if (Imgcodecs.imwrite(destination, image)) {
+                        Log.e("savedfilde", "yes");
+                    } else {
+                        Log.e("savedfilde", "no");
+                    }
+                    image.release();
             /*PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(image.width(), image.height(), i + 1).create();
             PdfDocument.Page page = document.startPage(pageInfo);*/
 /*
@@ -387,11 +399,11 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
           /*  page.getCanvas().drawBitmap(bmp, 0, 0, null);
             document.finishPage(page);*/
-        }
+                }
 
-        Intent data = new Intent();
+                Intent data = new Intent();
 
-        data.putExtra("paths", filePathes);
+                data.putExtra("paths", filePathes);
 
 
         /*File file = new File(newPath, "original_document.pdf");
@@ -409,8 +421,12 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         }*/
 
 
-        setResult(RESULT_OK, data);
-        finish();
+                setResult(RESULT_OK, data);
+                finish();
+            }
+        }.start();
+        // PdfDocument document = new PdfDocument();
+
     }
 
     @Override
@@ -425,7 +441,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                     Imgproc.cvtColor(frame, frame, Imgproc.COLOR_BGR2RGB);
 
                     Mat destImage = null;
-                    if(lastPoints != null){
+                    if (lastPoints != null) {
                         for (int i = 0; i < lastPoints.size(); i++) {
                             Point point = lastPoints.get(i);
                             point.x *= ratioWidth * (float) frame.width() / (float) preview.getWidth(); //(double) (frame.width() / srcMat.width());
@@ -455,8 +471,6 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                     pages.add(destImage);
 
 
-
-
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -466,7 +480,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
                             camera.startPreview();
                             camera.autoFocus(context);
-                            if(pages.size() == 1){
+                            if (pages.size() == 1) {
                                 doneBtn.setVisibility(View.GONE);
                                 doneBtn.setVisibility(View.VISIBLE);
                             }
@@ -523,7 +537,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         setLoaderVisibility(View.VISIBLE);
     }
 
-    public void setShotBtnVisibility(int visibility){
+    public void setShotBtnVisibility(int visibility) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -533,17 +547,17 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         });
     }
 
-    public void showShotBtn(){
+    public void showShotBtn() {
         setShotBtnVisibility(View.VISIBLE);
 
     }
 
-    public void hideShotBtn(){
+    public void hideShotBtn() {
         setShotBtnVisibility(View.INVISIBLE);
     }
 
 
-    public void setWaitTextVisibility(int visibility){
+    public void setWaitTextVisibility(int visibility) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -553,12 +567,12 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         });
     }
 
-    public void showWaitText(){
+    public void showWaitText() {
         setWaitTextVisibility(View.VISIBLE);
 
     }
 
-    public void hideWaitText(){
+    public void hideWaitText() {
         setWaitTextVisibility(View.INVISIBLE);
     }
 
@@ -583,7 +597,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                     Mat frame = MatHelper.rotate(MatHelper.getMatFromData(data, width, height, ratio));
                     Mat mask = MatHelper.applyFilters(frame);
 
-                   // drawOpencv(mask);
+                    // drawOpencv(mask);
 
 
                     if (!mask.empty()) {
@@ -625,9 +639,9 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                             counter = 0;
                             DrawOnUi(null);
                         }
-                        if(counter == 2){
+                        if (counter == 2) {
                             showWaitText();
-                        } else if(counter == 0){
+                        } else if (counter == 0) {
                             hideWaitText();
                         }
 
