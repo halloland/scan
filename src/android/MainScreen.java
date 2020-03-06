@@ -15,6 +15,7 @@ import android.hardware.Camera;
 import android.hardware.Camera.Size;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -59,6 +60,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
     private Button shotBtn;
     private Button autoBtn;
     private Button doneBtn;
+    private Button cancelBtn;
     private TextView waitText;
 
     private RectangleSearcher rectangleSearcher;
@@ -139,6 +141,8 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
 
         doneBtn = (Button) findViewById(this.getResourceId("buttonFinish", "id"));
 
+        cancelBtn = (Button) findViewById(this.getResourceId("buttonCancel", "id"));
+
         autoBtn = (Button) findViewById(this.getResourceId("button", "id"));
 
         waitText = (TextView) findViewById(this.getResourceId("textView", "id"));
@@ -146,6 +150,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
         doneBtn.setOnClickListener(this);
         autoBtn.setOnClickListener(this);
         shotBtn.setOnClickListener(this);
+        cancelBtn.setOnClickListener(this);
 
         this.rectangleSearcher = new RectangleSearcher();
 
@@ -341,9 +346,44 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                 autoBtn.setTextColor(Color.parseColor("#FFFFFF"));
             }
 
-        } else {
+        } else if(v == doneBtn){
             this.done();
+        } else if(v == cancelBtn){
+            this.cancel();
         }
+    }
+
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            this.cancel();
+
+            return true;
+        }
+
+        return super.onKeyDown(keyCode, event);
+    }
+
+    private void cancel(){
+        hideWaitText();
+        hideShotBtn();
+        showLoader();
+        doneBtn.setVisibility(View.GONE);
+        doneBtn.setVisibility(View.INVISIBLE);
+        disabled = true;
+        if (camera != null) {
+            camera.setPreviewCallback(null);
+            camera.stopPreview();
+            camera.release();
+            camera = null;
+        }
+        Draw(null);
+
+        Intent data = new Intent();
+
+        setResult(RESULT_CANCELED, data);
+        finish();
     }
 
     private void done() {
@@ -484,6 +524,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                                 doneBtn.setVisibility(View.GONE);
                                 doneBtn.setVisibility(View.VISIBLE);
                             }
+                            doneBtn.setText("Done (" + pages.size() + ")");
                             showShotBtn();
 
                         }

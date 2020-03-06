@@ -120,7 +120,7 @@ public class  Scan extends CordovaPlugin {
 
 
         } else {
-            callbackContext.error(intent.getStringExtra("error"));
+            callbackContext.error("CENCELED");
         }
     }
 
