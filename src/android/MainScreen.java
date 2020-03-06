@@ -507,7 +507,7 @@ public class MainScreen extends Activity implements SurfaceHolder.Callback, View
                         destImage = frame;
                     }
 
-
+					Imgproc.cvtColor(destImage, destImage, Imgproc.COLOR_BGR2RGB);
                     pages.add(destImage);
 
 
